@@ -25,10 +25,10 @@ function parse_card(input_string)
     -- string_parsed = parsed_string/themes
     local themes = parse_themes(input_string)["parsed_string"]
 
-    local pq     = parse_header(input_string, "==Q")
+    local pq     = parse_header(input_string, "=Q=")
     local fq, siq, eiq = pq["found"], pq["start_index"], pq["end_index"]
 
-    local pa     = parse_header(input_string, "==A")
+    local pa     = parse_header(input_string, "=A=")
     local fa, sia, eia = pa["found"], pa["start_index"], pa["end_index"]
 
     if (not fq) then error "ERROR: Card doesn't contain question." end

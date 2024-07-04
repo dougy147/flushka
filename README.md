@@ -1,19 +1,24 @@
-Some kind of flashcards parser.
+Write your own cards and use a simple terminal-based flashcard system to memorize them.
 
 ```console
 $ cat card.txt
-#maths,trigonometry  # comma-separated themes
-==Q
+#maths,trigonometry
+=Q=
 What is the pythagorean theorem?
-==A
+=A=
 a^2 + b^2 = c^2
+-----
 
 $ ./flushka card.txt
-What is the pytagorean theorem?
-a^2 + b^2 = c^2
+Q> What is the pytagorean theorem?
+#-- press Enter to display answer --
+A> a^2 + b^2 = c^2
+
+was your answer correct (y/n)? n
 ```
 
 TODO:
 
 * box system for classification and spaced learning
-* small database
+* small database (cards will need identifiers)
+* shuffling/theme selection

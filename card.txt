@@ -1,14 +1,14 @@
-
-
-#maths,trigo,,
-
-
-==Q
-
-
+-----
+#maths,trigonometry
+=Q=
 What is the pythagorean theorem?
-
-==A
-
-
+=A=
 a^2 + b^2 = c^2
+-----
+#coding
+=Q=
+How are recursive functions declared in OCaml?
+=A=
+With the "rec" keyword. For example:
+let rec da_deep_hole () = da_deep_hole ()
+-----
