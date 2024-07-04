@@ -18,7 +18,7 @@ function trim(string)
     -- (.-) avoids greediness, specific to lua
 end
 
-function parse_input(input_string)
+function parse_card(input_string)
     -- Parse functions return (bool,end_index,string_parsed)
     -- with bool = found what we are looking for
     -- end_index = location from which to parse if found it
@@ -111,6 +111,17 @@ function display(card)
 
     ---- Display answer
     print("A > ", answer)
+    print("-----------")
+end
+
+function display_question(card)
+    local question = card["question"]
+    print("Q > ", question)
+end
+
+function display_answer(card)
+    local answer = card["answer"]
+    print("A > ", answer)
 end
 
 function split_in_cards(input_string)
@@ -138,6 +149,36 @@ function split_in_cards(input_string)
     return cards
 end
 
+function play(card)
+    display_question(card)
+
+    -- Pressing Enter is forced (no stock key press handling in Lua)
+    local user_pressed_key
+    while (user_pressed_key == nil) do
+	user_pressed_key = io.read()
+    end
+    display_answer(card)
+    print("-----------")
+end
+
+function classify_card(card, score)
+    -- TODO: if score == 0, card must be put in most frequent box
+    --       else, card is distanced in the next box
+end
+
+function evaluate_answer(card)
+    local evaluate
+    repeat
+	io.write("was your answer correct (y/n)? ")
+	answer=io.read()
+    until answer=="y" or answer=="n"
+
+    -- TODO: classify_card(card, "wrong"/"right")
+    local score
+    if (answer == "y") then score = 1 else score = 0 end
+    -- classify_card(card, score)
+end
+
 function main ()
     if (#arg == 0) then
         error "ERROR: No input provided."
@@ -151,9 +192,10 @@ function main ()
 
     for i=1, #cards do
 	local card = trim(cards[i])
-    	local card = parse_input(card)
-    	display(card)
-	print("-----------")
+    	local card = parse_card(card)
+    	--display(card)
+	play(card)
+	evaluate_answer(card)
     end
 end
 

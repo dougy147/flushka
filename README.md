@@ -13,8 +13,7 @@ What is the pytagorean theorem?
 a^2 + b^2 = c^2
 ```
 
-TODO/IDEAS:
+TODO:
 
-* show question => press key => show answer
-* use feedback: correct answer = space card in time
+* box system for classification and spaced learning
 * small database
