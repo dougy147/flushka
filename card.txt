@@ -1,0 +1,14 @@
+
+
+#maths,trigo,,
+
+
+==Q
+
+
+What is the pythagorean theorem?
+
+==A
+
+
+a^2 + b^2 = c^2

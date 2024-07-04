@@ -1,0 +1,160 @@
+#!/usr/bin/env lua
+
+function read_file (path)
+    if not io.open(path, "rb") then
+	error (("ERROR: %s not found"):format(path))
+    end
+
+    lines = ""
+    for line in io.lines(path) do
+	lines = lines .. line .. "\n"
+    end
+    io.close()
+    return lines
+end
+
+function trim(string)
+    return string:match("^%s*(.-)%s*$")
+    -- (.-) avoids greediness, specific to lua
+end
+
+function parse_input(input_string)
+    -- Parse functions return (bool,end_index,string_parsed)
+    -- with bool = found what we are looking for
+    -- end_index = location from which to parse if found it
+    -- string_parsed = parsed_string/themes
+    local themes = parse_themes(input_string)["parsed_string"]
+
+    local pq     = parse_header(input_string, "==Q")
+    local fq, siq, eiq = pq["found"], pq["start_index"], pq["end_index"]
+
+    local pa     = parse_header(input_string, "==A")
+    local fa, sia, eia = pa["found"], pa["start_index"], pa["end_index"]
+
+    if (not fq) then error "ERROR: Card doesn't contain question." end
+    if (not fa) then error "ERROR: Card doesn't contain answer."   end
+
+    local question = trim(input_string:sub(eiq, sia))
+    local answer   = trim(input_string:sub(eia, #input_string))
+
+
+    if (trim(question) == "") then error "ERROR: Question is empty." end
+    if (trim(answer) == "")   then error "ERROR: Answer is empty."   end
+
+    return { themes = themes, question = question, answer = answer }
+end
+
+function parse_header (input_string, header)
+    for i = 1, #input_string do
+	if ( input_string:sub(i,#header + 1) == header .. "\n"
+	    or input_string:sub(i,#header + i + 1) == "\n" .. header .. "\n")
+	    then
+		local end_index = i + 1 + #header + 1
+		local parsed_string = input_string:sub(i+1,#header+i)
+		return { found = true,
+			 start_index = end_index - #header - 1 - 1,
+			 end_index = end_index,
+			 parsed_string = parsed_string,
+		       }
+	end
+    end
+    return { found = false,
+	     start_index = -1,
+	     end_index = -1,
+	     parsed_string = ""
+	   }
+end
+
+function parse_themes (input_string)
+    local themes = {}
+    if (input_string:sub(1,1) == "#") then
+	local current_theme = ""
+	for i=2, #input_string do
+	    local current_char = input_string:sub(i,i)
+	    if (current_char == "\n") then
+		if (#trim(current_theme) > 0) then
+		    themes[#themes+1] = trim(current_theme)
+		end
+		return { found = true,
+		         start_index = 1,
+			 end_index = i + 1,
+			 parsed_string = themes
+		       }
+	    end
+	    if (current_char == ",") then
+		if (#trim(current_theme) > 0) then
+		    themes[#themes+1] = trim(current_theme)
+		end
+		current_theme = ""
+	    else
+		current_theme = current_theme .. current_char
+	    end
+	end
+    end
+    return { found = false,
+	     start_index = 1,
+	     end_index = 1,
+	     parsed_string = ""
+	   }
+end
+
+function display(card)
+    local themes, question, answer = card["themes"], card["question"], card["answer"]
+
+    ---- Display themes
+    --for index, value in ipairs(themes) do
+    --    print(index,value)
+    --end
+
+    ---- Display question
+    print("Q > ", question)
+
+    ---- Display answer
+    print("A > ", answer)
+end
+
+function split_in_cards(input_string)
+    sep = "-----"
+    local cards = {}
+    local current_card = ""
+
+    while (#input_string ~= 0) do
+	if (input_string:sub(1,#sep) == sep) then
+	    if (current_card ~= "") then
+		cards[#cards + 1] = current_card
+	    end
+	    input_string = input_string:sub(#sep + 1,#input_string)
+	    current_card = ""
+	else
+	    current_card = current_card .. input_string:sub(1,1)
+	    input_string = input_string:sub(2,#input_string)
+	end
+    end
+
+    if (trim(current_card) ~= "") then
+	cards[#cards + 1] = trim(current_card)
+    end
+
+    return cards
+end
+
+function main ()
+    if (#arg == 0) then
+        error "ERROR: No input provided."
+    end
+
+    filepath = arg[1]
+
+    local content  = read_file(filepath)
+    -- Split if is a multicard file --
+    cards = split_in_cards(content)
+
+    for i=1, #cards do
+	local card = trim(cards[i])
+    	local card = parse_input(card)
+    	display(card)
+	print("-----------")
+    end
+end
+
+main()
