@@ -23,7 +23,8 @@ function parse_card(input_string)
     -- with bool = found what we are looking for
     -- end_index = location from which to parse if found it
     -- string_parsed = parsed_string/themes
-    local themes = parse_themes(input_string)["parsed_string"]
+    local input_string = trim(input_string)
+    local themes = parse_themes(input_string)
 
     local pq     = parse_header(input_string, "=Q=")
     local fq, siq, eiq = pq["found"], pq["start_index"], pq["end_index"]
@@ -41,7 +42,11 @@ function parse_card(input_string)
     if (trim(question) == "") then error "ERROR: Question is empty." end
     if (trim(answer) == "")   then error "ERROR: Answer is empty."   end
 
-    return { themes = themes, question = question, answer = answer }
+    return { themes = themes, question = question, answer = answer, raw = rebuild_for_db(themes,question,answer)}
+end
+
+function rebuild_for_db(themes,question,answer)
+    return themes["raw"] .. "\n=Q=\n" .. question .. "\n=A=\n" .. answer
 end
 
 function parse_header (input_string, header)
@@ -75,10 +80,15 @@ function parse_themes (input_string)
 		if (#trim(current_theme) > 0) then
 		    themes[#themes+1] = trim(current_theme)
 		end
+		raw_themes = "#"
+		for t=1,#themes do
+		    raw_themes = raw_themes .. "," .. themes[t]
+		end
 		return { found = true,
 		         start_index = 1,
 			 end_index = i + 1,
-			 parsed_string = themes
+			 parsed_string = themes,
+			 raw = raw_themes
 		       }
 	    end
 	    if (current_char == ",") then
@@ -94,24 +104,15 @@ function parse_themes (input_string)
     return { found = false,
 	     start_index = 1,
 	     end_index = 1,
-	     parsed_string = ""
+	     parsed_string = "",
+	     raw = "#"
 	   }
 end
 
 function display(card)
-    local themes, question, answer = card["themes"], card["question"], card["answer"]
-
-    ---- Display themes
-    --for index, value in ipairs(themes) do
-    --    print(index,value)
-    --end
-
-    ---- Display question
-    print("Q > ", question)
-
-    ---- Display answer
-    print("A > ", answer)
-    print("-----------")
+	clear_screen()
+	play(card)
+	rebox(card)
 end
 
 function display_question(card)
@@ -124,7 +125,7 @@ function display_answer(card)
     print("A > ", answer)
 end
 
-function split_in_cards(input_string)
+function split_and_trim_cards(input_string)
     sep = "-----"
     local cards = {}
     local current_card = ""
@@ -161,12 +162,7 @@ function play(card)
     print("-----------")
 end
 
-function classify_card(card, score)
-    -- TODO: if score == 0, card must be put in most frequent box
-    --       else, card is distanced in the next box
-end
-
-function evaluate_answer(card)
+function score(card)
     local evaluate
     repeat
 	io.write("\27[1A\27[K") -- move one line up and erase line
@@ -178,9 +174,10 @@ function evaluate_answer(card)
     local score
     if (answer == "y") then score = 1 else score = 0 end
     -- classify_card(card, score)
+    return score
 end
 
-function clear_terminal_screen ()
+function clear_screen ()
     io.write("\027[H\027[2J")
 end
 
@@ -192,26 +189,155 @@ function shuffle(cards)
     return shuffled
 end
 
+function rebox(card)
+    -- Store card in suitable box --
+    if score(card) == 0 or not boxes[card] then
+	boxes[card] = 1 -- card is stored in box 1
+    else
+	boxes[card] = boxes[card] + 1
+    end
+end
+
+function select_random_box()
+    -- Boxes have probabilities following this logic:
+    -- for n boxes labeled from n to 1 (hardest to easiest)
+    -- each box's probability is equal to : n / (n + (n-1) + ... + 1)
+    for i=1,max_boxes do
+	if math.random() <= boxes_probas[i] then
+	    return i
+	end
+    end
+end
+
+function generate_boxes_probas(max_boxes)
+    function sum_range(a,b)
+	local sum = 0
+	for i = a, b do
+	    sum = sum + i
+	end
+	return sum
+    end
+    local sum = sum_range(1,max_boxes)
+    local box_probs = {}
+    for i=1,max_boxes do
+	local box_prob = (max_boxes - (i - 1)) / sum
+	for j=i, max_boxes do
+	    if box_probs[j] == nil then
+		box_probs[j] = box_prob
+	    else
+		box_probs[j] = box_probs[j] + box_prob
+	    end
+	end
+    end
+    return box_probs
+end
+
+function select_random_card_from_box(box)
+    local cards_from_this_box = {}
+    for c,b in pairs(boxes) do
+	if b == box then
+	    table.insert(cards_from_this_box,c)
+	end
+    end
+    if #cards_from_this_box == 0 then return nil end
+    return cards_from_this_box[math.random(#cards_from_this_box)]
+end
+
+function database_write(db_path,card)
+    -- DUMB: We replace the whole file while
+    --       it would be better to replace
+    --       only where needed
+    local db = io.open(db_path, "a")
+    db:write("@BOX_" .. boxes[card] .. "=>" .. card["raw"] .. "\n")
+    --for card,box in pairs(boxes) do
+    --    db:write("@BOX_" .. box .. "=>" .. card["raw"] .. "\n")
+    --end
+    db:close()
+end
+
+function database_get_box_and_content(db_line)
+    local card_box = db_line:match("^@BOX_(%d+)=>")
+    local card_content = db_line:gsub("^(@BOX_%d+=>)(.*)", "%2")
+    return card_box, card_content
+end
+
+function database_read(db_path)
+    if not io.open(db_path, "rb") then
+	print("INFO: Creating `" .. db_path .. "` database.")
+	local db = io.open(db_path, "w")
+	db:close()
+	return
+    end
+    local db = io.open(db_path, "r")
+    local current_card = ""
+    local box_pattern = "@BOX_"
+    -- TODO: parse database
+    for line in io.lines(db_path) do
+	if line:sub(1, #box_pattern) == box_pattern and current_card ~= "" then
+	    local card_box, card_content = database_get_box_and_content(current_card)
+	    boxes[parse_card(card_content)] = card_box
+	    current_card = line .. "\n"
+	else
+	    current_card = current_card .. line .. "\n"
+	end
+    end
+    if current_card ~= "" then
+	local card_box, card_content = database_get_box_and_content(current_card)
+	boxes[parse_card(card_content)] = card_box
+    end
+    db:close()
+end
+
+function card_in_database(card)
+    for c,_ in pairs(boxes) do
+	--print(c["raw"], "************", card["raw"])
+	if c["raw"] == card["raw"] then
+	    return true
+	end
+    end
+    return false
+end
+
 function main ()
     if (#arg == 0) then
         error "ERROR: No input provided."
     end
 
-    filepath = arg[1]
+    local filepath = arg[1]
 
     local content  = read_file(filepath)
     -- Split if is a multicard file --
-    cards = split_in_cards(content)
-
+    cards = split_and_trim_cards(content)
     cards = shuffle(cards)
 
+    boxes = {}
+    max_boxes = 4 -- No more than x boxes
+    boxes_probas = generate_boxes_probas(max_boxes)
+
+    database_path = "db_flushka"
+    database_read(database_path) -- TODO: import database
+    -- TODO: check that imported labels <= max_boxes
+
+    -- Start by cards that aren't already in database --
     for i=1, #cards do
-	local card = trim(cards[i])
-    	local card = parse_card(card)
-    	--display(card)
-	clear_terminal_screen()
-	play(card)
-	evaluate_answer(card)
+    	local card = parse_card(cards[i])
+	if card_in_database(card) then
+	    goto continue
+	end
+        display(card)
+	database_write(database_path, card)
+        ::continue::
+    end
+    os.exit()
+
+    -- Play game --
+    while 1 do
+	local box  = select_random_box()
+	local card = select_random_card_from_box(box)
+	if card == nil then goto continue end
+	display(card)
+	database_write(database_path)
+	::continue::
     end
 end
 
