@@ -13,11 +13,6 @@ function read_file (path)
     return lines
 end
 
-function trim(string)
-    return string:match("^%s*(.-)%s*$")
-    -- (.-) avoids greediness, specific to lua
-end
-
 function parse_card(input_string)
     -- Parse functions return (bool,end_index,string_parsed)
     -- with bool = found what we are looking for
@@ -43,10 +38,6 @@ function parse_card(input_string)
     if (trim(answer) == "")   then error "ERROR: Answer is empty."   end
 
     return { themes = themes, question = question, answer = answer, raw = rebuild_for_db(themes,question,answer)}
-end
-
-function rebuild_for_db(themes,question,answer)
-    return themes["raw"] .. "\n=Q=\n" .. question .. "\n=A=\n" .. answer
 end
 
 function parse_header (input_string, header)
@@ -109,6 +100,29 @@ function parse_themes (input_string)
 	   }
 end
 
+function generate_boxes_probas(max_boxes)
+    function sum_range(a,b)
+	local sum = 0
+	for i = a, b do
+	    sum = sum + i
+	end
+	return sum
+    end
+    local sum = sum_range(1,max_boxes)
+    local box_probs = {}
+    for i=1,max_boxes do
+	local box_prob = (max_boxes - (i - 1)) / sum
+	for j=i, max_boxes do
+	    if box_probs[j] == nil then
+		box_probs[j] = box_prob
+	    else
+		box_probs[j] = box_probs[j] + box_prob
+	    end
+	end
+    end
+    return box_probs
+end
+
 function display(card)
 	clear_screen()
 	play(card)
@@ -123,6 +137,11 @@ end
 function display_answer(card)
     local answer = card["answer"]
     print("A > ", answer)
+end
+
+function trim(string)
+    return string:match("^%s*(.-)%s*$")
+    -- (.-) avoids greediness, specific to lua
 end
 
 function split_and_trim_cards(input_string)
@@ -170,15 +189,9 @@ function score(card)
 	answer=io.read()
     until answer=="y" or answer=="n"
 
-    -- TODO: classify_card(card, "wrong"/"right")
     local score
     if (answer == "y") then score = 1 else score = 0 end
-    -- classify_card(card, score)
     return score
-end
-
-function clear_screen ()
-    io.write("\027[H\027[2J")
 end
 
 function shuffle(cards)
@@ -200,8 +213,8 @@ end
 
 function select_random_box()
     -- Boxes have probabilities following this logic:
-    -- for n boxes labeled from n to 1 (hardest to easiest)
-    -- each box's probability is equal to : n / (n + (n-1) + ... + 1)
+    -- for n boxes labeled from i = 1 to n (easiest to hardest)
+    -- probability of box i equals to : (n-i+1) / (n + (n-1) + ... + 1)
     for i=1,max_boxes do
 	if math.random() <= boxes_probas[i] then
 	    return i
@@ -209,34 +222,11 @@ function select_random_box()
     end
 end
 
-function generate_boxes_probas(max_boxes)
-    function sum_range(a,b)
-	local sum = 0
-	for i = a, b do
-	    sum = sum + i
-	end
-	return sum
-    end
-    local sum = sum_range(1,max_boxes)
-    local box_probs = {}
-    for i=1,max_boxes do
-	local box_prob = (max_boxes - (i - 1)) / sum
-	for j=i, max_boxes do
-	    if box_probs[j] == nil then
-		box_probs[j] = box_prob
-	    else
-		box_probs[j] = box_probs[j] + box_prob
-	    end
-	end
-    end
-    return box_probs
-end
-
 function select_random_card_from_box(box)
     local cards_from_this_box = {}
     for c,b in pairs(boxes) do
-	if b == box then
-	    table.insert(cards_from_this_box,c)
+	if (b == box) then
+	    cards_from_this_box[#cards_from_this_box+1] = c
 	end
     end
     if #cards_from_this_box == 0 then return nil end
@@ -244,15 +234,29 @@ function select_random_card_from_box(box)
 end
 
 function database_write(db_path,card)
-    -- DUMB: We replace the whole file while
-    --       it would be better to replace
-    --       only where needed
-    local db = io.open(db_path, "a")
-    db:write("@BOX_" .. boxes[card] .. "=>" .. card["raw"] .. "\n")
-    --for card,box in pairs(boxes) do
-    --    db:write("@BOX_" .. box .. "=>" .. card["raw"] .. "\n")
-    --end
+    -- DUMB: We replace the whole database
+    -- while it would be better to replace
+    -- only where needed... TODO
+
+    -- Erase database --
+    local db = io.open(db_path, "w")
+    db:write("")
     db:close()
+
+    -- Populate database --
+    local db = io.open(db_path, "a")
+    for c,box in pairs(boxes) do
+	if c["raw"] == card["raw"] then
+	    db:write("@BOX_" .. boxes[card] .. "=>" .. card["raw"] .. "\n")
+	else
+	    db:write("@BOX_" .. boxes[c] .. "=>" .. c["raw"] .. "\n")
+	end
+    end
+    db:close()
+end
+
+function rebuild_for_db(themes,question,answer)
+    return themes["raw"] .. "\n=Q=\n" .. question .. "\n=A=\n" .. answer
 end
 
 function database_get_box_and_content(db_line)
@@ -271,11 +275,11 @@ function database_read(db_path)
     local db = io.open(db_path, "r")
     local current_card = ""
     local box_pattern = "@BOX_"
-    -- TODO: parse database
+
     for line in io.lines(db_path) do
 	if line:sub(1, #box_pattern) == box_pattern and current_card ~= "" then
 	    local card_box, card_content = database_get_box_and_content(current_card)
-	    boxes[parse_card(card_content)] = card_box
+	    boxes[parse_card(card_content)] = tonumber(card_box)
 	    current_card = line .. "\n"
 	else
 	    current_card = current_card .. line .. "\n"
@@ -283,19 +287,22 @@ function database_read(db_path)
     end
     if current_card ~= "" then
 	local card_box, card_content = database_get_box_and_content(current_card)
-	boxes[parse_card(card_content)] = card_box
+	boxes[parse_card(card_content)] = tonumber(card_box)
     end
     db:close()
 end
 
-function card_in_database(card)
+function is_card_in_database(card)
     for c,_ in pairs(boxes) do
-	--print(c["raw"], "************", card["raw"])
 	if c["raw"] == card["raw"] then
 	    return true
 	end
     end
     return false
+end
+
+function clear_screen ()
+    io.write("\027[H\027[2J")
 end
 
 function main ()
@@ -321,14 +328,13 @@ function main ()
     -- Start by cards that aren't already in database --
     for i=1, #cards do
     	local card = parse_card(cards[i])
-	if card_in_database(card) then
+	if is_card_in_database(card) then
 	    goto continue
 	end
         display(card)
 	database_write(database_path, card)
         ::continue::
     end
-    os.exit()
 
     -- Play game --
     while 1 do
@@ -336,7 +342,7 @@ function main ()
 	local card = select_random_card_from_box(box)
 	if card == nil then goto continue end
 	display(card)
-	database_write(database_path)
+	database_write(database_path, card)
 	::continue::
     end
 end

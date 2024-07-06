@@ -9,6 +9,14 @@ A> a^2 + b^2 = c^2
 was your answer correct (y/n)? n
 ```
 
+Cards are placed inside boxes labeled from 1 to 4 by default.
+Each box is assigned a probability of being selected.
+Highest the label, lowest the chance.
+
+For instance, for `n` boxes labeled from `i=1` to `n`, probability of box `i` = `(n-i+1) / (1+2+...+n)`
+
+When your answer is correct, the current card is moved to the next box.
+
 ## Card syntax
 
 ```console
@@ -22,6 +30,4 @@ What is 1 + 1?
 
 TODO:
 
-* box system for classification and spaced learning
-* small database (cards will need identifiers)
-* shuffling/theme selection
+* theme selection
