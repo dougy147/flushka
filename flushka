@@ -169,7 +169,8 @@ end
 function evaluate_answer(card)
     local evaluate
     repeat
-	io.write("was your answer correct (y/n)? ")
+	io.write("\27[1A\27[K") -- move one line up and erase line
+	io.write("did you guess right? (y/n) ")
 	answer=io.read()
     until answer=="y" or answer=="n"
 
@@ -177,6 +178,18 @@ function evaluate_answer(card)
     local score
     if (answer == "y") then score = 1 else score = 0 end
     -- classify_card(card, score)
+end
+
+function clear_terminal_screen ()
+    io.write("\027[H\027[2J")
+end
+
+function shuffle(cards)
+    local shuffled = {}
+    while #cards > 0 do
+	shuffled[#shuffled+1] = table.remove(cards,math.random(#cards))
+    end
+    return shuffled
 end
 
 function main ()
@@ -190,10 +203,13 @@ function main ()
     -- Split if is a multicard file --
     cards = split_in_cards(content)
 
+    cards = shuffle(cards)
+
     for i=1, #cards do
 	local card = trim(cards[i])
     	local card = parse_card(card)
     	--display(card)
+	clear_terminal_screen()
 	play(card)
 	evaluate_answer(card)
     end
