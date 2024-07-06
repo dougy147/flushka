@@ -2,7 +2,7 @@ Write your own cards and use a simple terminal-based flashcard system to memoriz
 
 ```console
 $ ./flushka card.txt
-Q> What is the pytagorean theorem?
+Q> What is the pythagorean theorem?
 #-- press Enter to display answer --
 A> a^2 + b^2 = c^2
 
@@ -31,3 +31,4 @@ What is 1 + 1?
 TODO:
 
 * theme selection
+* avoid being asked twice

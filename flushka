@@ -1,8 +1,14 @@
 #!/usr/bin/env lua
 
+cards = {}
+boxes = {}
+
+database_path = "./db_flushka"
+max_boxes = 4
+
 function read_file (path)
     if not io.open(path, "rb") then
-	error (("ERROR: %s not found"):format(path))
+	error (("ERROR: File `%s` not found."):format(path))
     end
 
     lines = ""
@@ -208,6 +214,9 @@ function rebox(card)
 	boxes[card] = 1 -- card is stored in box 1
     else
 	boxes[card] = boxes[card] + 1
+	if boxes[card] > max_boxes then
+	    boxes[card] = max_boxes
+	end
     end
 end
 
@@ -305,25 +314,30 @@ function clear_screen ()
     io.write("\027[H\027[2J")
 end
 
-function main ()
-    if (#arg == 0) then
-        error "ERROR: No input provided."
-    end
-
-    local filepath = arg[1]
-
+function import_card_file(filepath)
     local content  = read_file(filepath)
     -- Split if is a multicard file --
-    cards = split_and_trim_cards(content)
+    local found_card = split_and_trim_cards(content)
+    for i=1, #found_card do
+	cards[#cards+1] = found_card[i]
+    end
+end
+
+function main ()
+    if (#arg ~= 0) then
+	for i=1, #arg do
+	    import_card_file(arg[i])
+	end
+    end
+
+    database_read(database_path)
+
+    if not cards and not boxes then
+	error "No card available."
+    end
+
     cards = shuffle(cards)
-
-    boxes = {}
-    max_boxes = 4 -- No more than x boxes
     boxes_probas = generate_boxes_probas(max_boxes)
-
-    database_path = "db_flushka"
-    database_read(database_path) -- TODO: import database
-    -- TODO: check that imported labels <= max_boxes
 
     -- Start by cards that aren't already in database --
     for i=1, #cards do
